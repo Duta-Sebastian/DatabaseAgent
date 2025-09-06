@@ -20,11 +20,11 @@ class OperationClassifier:
         self.schema_extractor = SchemaExtractor()
         self.schema_info = self.schema_extractor.get_schema_for_classification()
 
-    def classify_operation(self, user_query: str) -> dict[str, Any]:
+    def classify_operation(self, user_query: str, conversation_history: str) -> dict[str, Any]:
         """Classify the database operation type from user query"""
         logger.info(f"Classifying operation for: {user_query}")
 
-        result = self._classify_with_llm(user_query)
+        result = self._classify_with_llm(user_query, conversation_history)
 
         op_info = self.get_operation_info(result["operation_type"])
         result["safety_level"] = op_info["safety_level"]
@@ -38,7 +38,7 @@ class OperationClassifier:
 
         return result
 
-    def _classify_with_llm(self, user_query: str) -> dict[str, Any]:
+    def _classify_with_llm(self, user_query: str, conversation_history: str) -> dict[str, Any]:
         """Use LLM for operation classification with schema context"""
 
         prompt = ChatPromptTemplate.from_messages([
@@ -46,6 +46,9 @@ class OperationClassifier:
 
 DATABASE SCHEMA:
 {self.schema_info}
+
+CONVERSATION CONTEXT:
+{conversation_history}
 
 OPERATION TYPES:
 

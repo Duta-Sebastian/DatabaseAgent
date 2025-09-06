@@ -20,11 +20,12 @@ class IntentAnalyzer:
         self.schema_extractor = SchemaExtractor()
         self.schema_info = self.schema_extractor.get_schema_for_classification()
 
-    def analyze_intent(self, user_query: str, operation_type: OperationType, reasoning: str) -> dict[str, Any]:
+    def analyze_intent(self, user_query: str, operation_type: OperationType,
+                       reasoning: str, conversation_history: str | None) -> dict[str, Any]:
         """Analyze user intent based on query, operation type, and classification reasoning"""
         logger.info(f"Analyzing intent for {operation_type}: {user_query}")
 
-        intent_result = self._analyze_with_llm(user_query, operation_type, reasoning)
+        intent_result = self._analyze_with_llm(user_query, operation_type, reasoning, conversation_history)
 
         intent_result["operation_type"] = operation_type
         intent_result["original_query"] = user_query
@@ -32,7 +33,8 @@ class IntentAnalyzer:
 
         return intent_result
 
-    def _analyze_with_llm(self, user_query: str, operation_type: OperationType, reasoning: str) -> dict[str, Any]:
+    def _analyze_with_llm(self, user_query: str, operation_type: OperationType,
+                          reasoning: str, conversation_history: str) -> dict[str, Any]:
         """Analyze intent using LLM"""
 
         prompt = ChatPromptTemplate.from_messages([
@@ -40,6 +42,9 @@ class IntentAnalyzer:
 
 DATABASE SCHEMA:
 {self.schema_info}
+
+TAKE INTO ACCOUNT THE CONVERSATION HISTORY OF THE REQUESTER:
+{conversation_history}
 
 CLASSIFICATION CONTEXT:
 Operation Type: {operation_type}

@@ -18,8 +18,9 @@ class DataValidator:
         self.schema_extractor = SchemaExtractor()
         self.schema_info = self.schema_extractor.get_schema_for_classification()
 
-    def validate_data_completeness(self, intent_analysis: dict[str, Any], classification_result: dict[str, Any]) -> \
-    dict[str, Any]:
+    def validate_data_completeness(self, intent_analysis: dict[str, Any],
+                                   classification_result: dict[str, Any],
+                                   conversation_history: str) -> dict[str, Any]:
         """Check if we have all necessary data to proceed with SQL generation"""
 
         operation_type = classification_result.get("operation_type", "UNKNOWN")
@@ -27,13 +28,13 @@ class DataValidator:
 
         try:
             if operation_type in ["SELECT", "COUNT", "AGGREGATE"]:
-                return self._validate_read_operation(intent_analysis)
+                return self._validate_read_operation(intent_analysis, conversation_history)
             elif operation_type == "INSERT":
-                return self._validate_insert_operation(intent_analysis)
+                return self._validate_insert_operation(intent_analysis, conversation_history)
             elif operation_type == "UPDATE":
-                return self._validate_update_operation(intent_analysis)
+                return self._validate_update_operation(intent_analysis, conversation_history)
             elif operation_type == "DELETE":
-                return self._validate_delete_operation(intent_analysis)
+                return self._validate_delete_operation(intent_analysis, conversation_history)
             else:
                 return {
                     "is_complete": False,
@@ -53,15 +54,17 @@ class DataValidator:
                 "can_proceed_to_sql": False
             }
 
-    def _validate_read_operation(self, intent_analysis: dict[str, Any]) -> dict[str, Any]:
+    def _validate_read_operation(self, intent_analysis: dict[str, Any], conversation_context: str) -> dict[str, Any]:
         """Validate SELECT/COUNT/AGGREGATE operations using LLM"""
+
+        context_section = f"\nCONVERSATION CONTEXT:\n{conversation_context}\n" if conversation_context else ""
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", f"""You are validating if a READ operation (SELECT/COUNT/AGGREGATE) has sufficient data.
 
 DATABASE SCHEMA:
 {self.schema_info}
-
+{context_section}
 INTENT ANALYSIS:
 - Intent: {intent_analysis.get('intent_description', '')}
 - Tables: {intent_analysis.get('tables_needed', [])}
@@ -74,6 +77,7 @@ For READ operations, check:
 2. Are the columns/data requested clear enough?
 3. Are any conditions or filters clear enough?
 
+Consider the conversation context when evaluating if references are clear.
 Most READ operations can proceed even with minimal info, but some might need clarification.
 
 Respond in this format:
@@ -87,15 +91,17 @@ NOTES: [brief explanation]"""),
         response = self.llm.invoke(prompt.format_messages())
         return self._parse_validation_response(response.content)
 
-    def _validate_insert_operation(self, intent_analysis: dict[str, Any]) -> dict[str, Any]:
+    def _validate_insert_operation(self, intent_analysis: dict[str, Any], conversation_context: str) -> dict[str, Any]:
         """Validate INSERT operations using LLM"""
+
+        context_section = f"\nCONVERSATION CONTEXT:\n{conversation_context}\n" if conversation_context else ""
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", f"""You are validating if an INSERT operation has sufficient data.
 
 DATABASE SCHEMA:
 {self.schema_info}
-
+{context_section}
 INTENT ANALYSIS:
 - Intent: {intent_analysis.get('intent_description', '')}
 - Tables: {intent_analysis.get('tables_needed', [])}
@@ -108,6 +114,8 @@ For INSERT operations, check:
 2. Do we have VALUES for required fields?
 3. Are there missing required fields that need user input?
 
+Consider the conversation context when evaluating if information is complete.
+
 Respond in this format:
 IS_COMPLETE: [true/false]
 MISSING_DATA: [comma-separated list of missing required data, or "none"]
@@ -119,15 +127,17 @@ NOTES: [brief explanation of what's missing]"""),
         response = self.llm.invoke(prompt.format_messages())
         return self._parse_validation_response(response.content)
 
-    def _validate_update_operation(self, intent_analysis: dict[str, Any]) -> dict[str, Any]:
+    def _validate_update_operation(self, intent_analysis: dict[str, Any], conversation_context: str) -> dict[str, Any]:
         """Validate UPDATE operations using LLM"""
+
+        context_section = f"\nCONVERSATION CONTEXT:\n{conversation_context}\n" if conversation_context else ""
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", f"""You are validating if an UPDATE operation has sufficient data.
 
 DATABASE SCHEMA:
 {self.schema_info}
-
+{context_section}
 INTENT ANALYSIS:
 - Intent: {intent_analysis.get('intent_description', '')}
 - Tables: {intent_analysis.get('tables_needed', [])}
@@ -138,30 +148,34 @@ INTENT ANALYSIS:
 For UPDATE operations, check:
 1. Do we know WHICH records to update (WHERE conditions)?
 2. Do we know WHAT to update TO (new values)?
-3. Are the conditions specific enough to avoid updating too many records?
+3. Are the conditions specific enough?
 
-UPDATE without proper WHERE conditions is dangerous and should require clarification.
+IMPORTANT: A condition like "id = 3" or "email = 'john@example.com'" is SUFFICIENT and SAFE.
+Only flag as incomplete if conditions are truly missing or overly broad like "update all users".
+Consider the conversation context when evaluating if references are clear.
 
 Respond in this format:
 IS_COMPLETE: [true/false]
 MISSING_DATA: [comma-separated list of missing data, or "none"]
 QUESTIONS: [specific questions to ask user, separated by |, or "none"]
-NOTES: [brief explanation of what's missing or why it's unsafe]"""),
+NOTES: [brief explanation]"""),
             ("human", f"Validate UPDATE operation for: {intent_analysis.get('original_query', '')}")
         ])
 
         response = self.llm.invoke(prompt.format_messages())
         return self._parse_validation_response(response.content)
 
-    def _validate_delete_operation(self, intent_analysis: dict[str, Any]) -> dict[str, Any]:
+    def _validate_delete_operation(self, intent_analysis: dict[str, Any], conversation_context: str) -> dict[str, Any]:
         """Validate DELETE operations using LLM"""
+
+        context_section = f"\nCONVERSATION CONTEXT:\n{conversation_context}\n" if conversation_context else ""
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", f"""You are validating if a DELETE operation has sufficient data.
 
 DATABASE SCHEMA:
 {self.schema_info}
-
+{context_section}
 INTENT ANALYSIS:
 - Intent: {intent_analysis.get('intent_description', '')}
 - Tables: {intent_analysis.get('tables_needed', [])}
@@ -175,6 +189,7 @@ For DELETE operations, check:
 3. Is this a safe deletion or could it affect many records?
 
 DELETE operations are dangerous and must have precise conditions. Broad deletions like "delete all" or "delete everything" require explicit confirmation.
+Consider the conversation context when evaluating if references are clear.
 
 Respond in this format:
 IS_COMPLETE: [true/false]
