@@ -24,10 +24,19 @@ class SchemaExtractor:
 
             # Get columns
             columns = self.inspector.get_columns(table_name)
+            # Get the primary key columns
+            pk_columns = self.inspector.get_pk_constraint(table_name)['constrained_columns']
+
             for col in columns:
                 col_info = f"  - {col['name']} ({col['type']})"
                 if not col['nullable']:
                     col_info += " NOT NULL"
+
+                # Check if the primary keys are auto-generated ( if so they don't need to be specified )
+                if (col['name'] in pk_columns and
+                        col.get('autoincrement', False) or
+                        col.get('server_default') is not None):
+                    col_info += " AUTO-GENERATED"
                 schema_parts.append(col_info)
 
             # Get primary key

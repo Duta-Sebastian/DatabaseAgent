@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: agent_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-agent_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - agent_network
+
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # Removed cache_from - python:3.11-slim doesn't match Dockerfile's python:3.13-slim
+    container_name: ai_agent
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-agent_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+    stdin_open: true
+    tty: true
+    networks:
+      - agent_network
+    restart: unless-stopped
+
+networks:
+  agent_network:
+    driver: bridge
+
+volumes:
+  postgres_data:

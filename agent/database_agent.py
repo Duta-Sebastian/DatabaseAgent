@@ -72,7 +72,8 @@ class DatabaseAgent:
 
         return workflow
 
-    def _should_clarify_or_proceed(self, state: AgentState) -> Literal["clarify", "generate_sql"]:
+    @staticmethod
+    def _should_clarify_or_proceed(state: AgentState) -> Literal["clarify", "generate_sql"]:
         """Decide whether to ask for clarification or proceed to SQL generation"""
         validation_result = state.get("validation_result", {})
         if validation_result.get("needs_clarification", False):

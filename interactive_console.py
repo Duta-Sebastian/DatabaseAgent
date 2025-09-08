@@ -1,5 +1,4 @@
 import logging
-import sys
 from typing import Dict, Optional
 from datetime import datetime
 
@@ -39,7 +38,8 @@ class InteractiveConsole:
             print(f"Failed to initialize agent: {e}")
             return False
 
-    def print_welcome(self):
+    @staticmethod
+    def print_welcome():
         """Print welcome message and instructions"""
         print("=" * 70)
         print("      AI Database Agent - Interactive Console")
@@ -130,15 +130,15 @@ class InteractiveConsole:
             execution_result = result.get('execution_result', {})
             if execution_result.get('success'):
                 self.session_stats["successful_queries"] += 1
-                print(f"\n✅ Query completed successfully!")
+                print(f"\nQuery completed successfully!")
             else:
                 error_msg = execution_result.get('error', 'Unknown error')
-                print(f"\n❌ Query failed: {error_msg}")
+                print(f"\nQuery failed: {error_msg}")
 
             return True  # Query completed
 
         except Exception as e:
-            print(f"\n❌ Error processing query: {e}")
+            print(f"\nError processing query: {e}")
             logger.error(f"Query processing failed: {e}")
             return True  # Consider it completed (with error)
 
@@ -175,16 +175,17 @@ class InteractiveConsole:
                 print(f"\n✅ Query completed successfully!")
             else:
                 error_msg = execution_result.get('error', 'Unknown error')
-                print(f"\n❌ Query failed: {error_msg}")
+                print(f"\nQuery failed: {error_msg}")
 
             return True  # Query completed
 
         except Exception as e:
-            print(f"\n❌ Error processing clarification: {e}")
+            print(f"\nError processing clarification: {e}")
             logger.error(f"Clarification processing failed: {e}")
             return True  # Consider it completed (with error)
 
-    def _needs_clarification(self, result: Dict) -> bool:
+    @staticmethod
+    def _needs_clarification(result: Dict) -> bool:
         """Check if the result indicates clarification is needed"""
         return (
                 result.get('validation_result', {}).get('needs_clarification', False) or
@@ -193,7 +194,8 @@ class InteractiveConsole:
                 not result.get('execution_result', {}).get('error')  # No error means it's waiting
         )
 
-    def _extract_clarification_message(self, result: Dict) -> Optional[str]:
+    @staticmethod
+    def _extract_clarification_message(result: Dict) -> Optional[str]:
         """Extract clarification message from agent result"""
         messages = result.get('messages', [])
         if messages:
@@ -253,13 +255,3 @@ class InteractiveConsole:
             return 1
 
         return 0
-
-
-def main():
-    """Main entry point"""
-    console = InteractiveConsole()
-    return console.run()
-
-
-if __name__ == "__main__":
-    sys.exit(main())
