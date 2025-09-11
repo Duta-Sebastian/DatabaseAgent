@@ -1,8 +1,8 @@
 from typing import Any
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 import logging
 
+from agent.helper import litellm_wrapper
 from agent.schema_extractor import SchemaExtractor
 
 logger = logging.getLogger(__name__)
@@ -13,8 +13,7 @@ class DataValidator:
     Stage 3: Validate if we have sufficient data to proceed with SQL generation
     """
 
-    def __init__(self, llm: ChatOpenAI):
-        self.llm = llm
+    def __init__(self):
         self.schema_extractor = SchemaExtractor()
         self.schema_info = self.schema_extractor.get_schema_for_classification()
 
@@ -59,9 +58,9 @@ class DataValidator:
 
         context_section = f"\nCONVERSATION CONTEXT:\n{conversation_context}\n" if conversation_context else ""
 
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", f"""You are validating if a READ operation (SELECT/COUNT/AGGREGATE) has sufficient data.
-
+        messages = [
+            {"role": "system",
+             "content": f"""You are validating if a READ operation (SELECT/COUNT/AGGREGATE) has sufficient data.
 DATABASE SCHEMA:
 {self.schema_info}
 {context_section}
@@ -84,20 +83,20 @@ Respond in this format:
 IS_COMPLETE: [true/false]
 MISSING_DATA: [comma-separated list of missing data, or "none"]
 QUESTIONS: [specific questions to ask user, separated by |, or "none"]
-NOTES: [brief explanation]"""),
-            ("human", f"Validate READ operation for: {intent_analysis.get('original_query', '')}")
-        ])
+NOTES: [brief explanation]""",},
+         {"role" : "user", "content" : f"Validate READ operation for: {intent_analysis.get('original_query', '')}"}
+        ]
 
-        response = self.llm.invoke(prompt.format_messages())
-        return self._parse_validation_response(response.content)
+        response = litellm_wrapper(messages)
+        return self._parse_validation_response(response)
 
     def _validate_insert_operation(self, intent_analysis: dict[str, Any], conversation_context: str) -> dict[str, Any]:
         """Validate INSERT operations using LLM"""
 
         context_section = f"\nCONVERSATION CONTEXT:\n{conversation_context}\n" if conversation_context else ""
 
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", f"""You are validating if an INSERT operation has sufficient data.
+        messages = [
+            {"role": "system","content": f"""You are validating if an INSERT operation has sufficient data.
 
 DATABASE SCHEMA:
 {self.schema_info}
@@ -120,20 +119,20 @@ Respond in this format:
 IS_COMPLETE: [true/false]
 MISSING_DATA: [comma-separated list of missing required data, or "none"]
 QUESTIONS: [specific questions to ask user, separated by |, or "none"]
-NOTES: [brief explanation of what's missing]"""),
-            ("human", f"Validate INSERT data for: {intent_analysis.get('original_query', '')}")
-        ])
+NOTES: [brief explanation of what's missing]"""},
+            {"role": "user","content": f"Validate INSERT data for: {intent_analysis.get('original_query', '')}"}
+        ]
 
-        response = self.llm.invoke(prompt.format_messages())
-        return self._parse_validation_response(response.content)
+        response = litellm_wrapper(messages)
+        return self._parse_validation_response(response)
 
     def _validate_update_operation(self, intent_analysis: dict[str, Any], conversation_context: str) -> dict[str, Any]:
         """Validate UPDATE operations using LLM"""
 
         context_section = f"\nCONVERSATION CONTEXT:\n{conversation_context}\n" if conversation_context else ""
 
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", f"""You are validating if an UPDATE operation has sufficient data.
+        messages = [
+            {"role": "system","content": f"""You are validating if an UPDATE operation has sufficient data.
 
 DATABASE SCHEMA:
 {self.schema_info}
@@ -158,20 +157,20 @@ Respond in this format:
 IS_COMPLETE: [true/false]
 MISSING_DATA: [comma-separated list of missing data, or "none"]
 QUESTIONS: [specific questions to ask user, separated by |, or "none"]
-NOTES: [brief explanation]"""),
-            ("human", f"Validate UPDATE operation for: {intent_analysis.get('original_query', '')}")
-        ])
+NOTES: [brief explanation]"""},
+            {"role": "user","content": f"Validate UPDATE operation for: {intent_analysis.get('original_query', '')}"}
+        ]
 
-        response = self.llm.invoke(prompt.format_messages())
-        return self._parse_validation_response(response.content)
+        response = litellm_wrapper(messages)
+        return self._parse_validation_response(response)
 
     def _validate_delete_operation(self, intent_analysis: dict[str, Any], conversation_context: str) -> dict[str, Any]:
         """Validate DELETE operations using LLM"""
 
         context_section = f"\nCONVERSATION CONTEXT:\n{conversation_context}\n" if conversation_context else ""
 
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", f"""You are validating if a DELETE operation has sufficient data.
+        messages = [
+            {"role": "system","content": f"""You are validating if a DELETE operation has sufficient data.
 
 DATABASE SCHEMA:
 {self.schema_info}
@@ -195,12 +194,12 @@ Respond in this format:
 IS_COMPLETE: [true/false]
 MISSING_DATA: [comma-separated list of missing data, or "none"]
 QUESTIONS: [specific questions to ask user, separated by |, or "none"]
-NOTES: [brief explanation of safety concerns or missing conditions]"""),
-            ("human", f"Validate DELETE operation for: {intent_analysis.get('original_query', '')}")
-        ])
+NOTES: [brief explanation of safety concerns or missing conditions]"""},
+            {"role": "user","content": f"Validate DELETE operation for: {intent_analysis.get('original_query', '')}"}
+        ]
 
-        response = self.llm.invoke(prompt.format_messages())
-        return self._parse_validation_response(response.content)
+        response = litellm_wrapper(messages)
+        return self._parse_validation_response(response)
 
     @staticmethod
     def _parse_validation_response(response: str) -> dict[str, Any]:

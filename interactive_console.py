@@ -3,6 +3,8 @@ from typing import Dict, Optional
 from datetime import datetime
 
 from langchain_openai import ChatOpenAI
+from litellm import completion
+
 from agent.database_agent import DatabaseAgent
 
 # Configure logging
@@ -30,8 +32,7 @@ class InteractiveConsole:
         """Initialize the AI agent"""
         try:
             print("Initializing Database Agent...")
-            llm = ChatOpenAI(model="gpt-4o", temperature=0)
-            self.agent = DatabaseAgent(llm)
+            self.agent = DatabaseAgent()
             print("Agent initialized successfully!\n")
             return True
         except Exception as e:

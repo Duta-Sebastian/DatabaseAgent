@@ -28,12 +28,11 @@ class AgentState(TypedDict):
 class DatabaseAgent:
     """LangGraph-based database agent with memory for conversations"""
 
-    def __init__(self, llm: ChatOpenAI):
-        self.llm = llm
-        self.classifier = OperationClassifier(llm)
-        self.intent_analyzer = IntentAnalyzer(llm)
-        self.data_validator = DataValidator(llm)
-        self.sql_generator = SQLGenerator(llm)
+    def __init__(self):
+        self.classifier = OperationClassifier()
+        self.intent_analyzer = IntentAnalyzer()
+        self.data_validator = DataValidator()
+        self.sql_generator = SQLGenerator()
         self.sql_executor = SQLExecutor()
 
         # Use MemorySaver for conversation context - avoids SQLite conflicts
@@ -232,8 +231,7 @@ class DatabaseAgent:
                 return {**state, "sql_result": {"error": "Data validation failed"}}
 
             sql_result = self.sql_generator.generate_sql(
-                state["intent_analysis"],
-                state["classification_result"]
+                state["intent_analysis"]
             )
 
             print(f"SQL Generation Result:")

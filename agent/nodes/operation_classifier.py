@@ -1,8 +1,7 @@
 from typing import Any, Literal
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 import logging
 
+from agent.helper import litellm_wrapper
 from agent.schema_extractor import SchemaExtractor
 
 logger = logging.getLogger(__name__)
@@ -15,8 +14,7 @@ class OperationClassifier:
     Classify database operations from natural language using LLM with schema context
     """
 
-    def __init__(self, llm: ChatOpenAI):
-        self.llm = llm
+    def __init__(self):
         self.schema_extractor = SchemaExtractor()
         self.schema_info = self.schema_extractor.get_schema_for_classification()
 
@@ -41,53 +39,59 @@ class OperationClassifier:
     def _classify_with_llm(self, user_query: str, conversation_history: str) -> dict[str, Any]:
         """Use LLM for operation classification with schema context"""
 
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", f"""You are a database operation classifier with knowledge of the database schema.
+        messages = [
+            {
+                "role": "system",
+                "content": f"""You are a database operation classifier with knowledge of the database schema.
 
-DATABASE SCHEMA:
-{self.schema_info}
+        DATABASE SCHEMA:
+        {self.schema_info}
 
-CONVERSATION CONTEXT:
-{conversation_history}
+        CONVERSATION CONTEXT:
+        {conversation_history}
 
-OPERATION TYPES:
+        OPERATION TYPES:
 
-**SELECT** - Reading/retrieving data
-Examples: "show users", "list products", "find orders"
+        **SELECT** - Reading/retrieving data
+        Examples: "show users", "list products", "find orders"
 
-**COUNT** - Counting records  
-Examples: "how many users", "count orders", "number of products"
+        **COUNT** - Counting records  
+        Examples: "how many users", "count orders", "number of products"
 
-**AGGREGATE** - Mathematical calculations
-Examples: "sum of sales", "average price", "total revenue", "maximum order"
+        **AGGREGATE** - Mathematical calculations
+        Examples: "sum of sales", "average price", "total revenue", "maximum order"
 
-**INSERT** - Adding new data
-Examples: "add user", "create product", "insert order"
+        **INSERT** - Adding new data
+        Examples: "add user", "create product", "insert order"
 
-**UPDATE** - Modifying existing data
-Examples: "update email", "change price", "modify status"
+        **UPDATE** - Modifying existing data
+        Examples: "update email", "change price", "modify status"
 
-**DELETE** - Removing data
-Examples: "delete user", "remove product", "clear orders"
+        **DELETE** - Removing data
+        Examples: "delete user", "remove product", "clear orders"
 
-**UNKNOWN** - Cannot determine operation (use sparingly)
+        **UNKNOWN** - Cannot determine operation (use sparingly)
 
-CLASSIFICATION RULES:
-1. Look for table/column names from schema in the query
-2. Match mathematical terms with numeric columns
-3. Focus on the primary intent of the query
-4. Use UNKNOWN only when truly unclear
+        CLASSIFICATION RULES:
+        1. Look for table/column names from schema in the query
+        2. Match mathematical terms with numeric columns
+        3. Focus on the primary intent of the query
+        4. Use UNKNOWN only when truly unclear
 
-Return format:
-OPERATION: [operation_type]
-CONFIDENCE: [0.0-1.0]
-REASONING: [brief explanation]"""),
-            ("human", f"Classify: '{user_query}'")
-        ])
+        Return format:
+        OPERATION: [operation_type]
+        CONFIDENCE: [0.0-1.0]
+        REASONING: [brief explanation]"""
+            },
+            {
+                "role": "user",
+                "content": f"Classify: '{user_query}'"
+            }
+        ]
 
         try:
-            response = self.llm.invoke(prompt.format_messages())
-            return self._parse_response(response.content, user_query)
+            response = litellm_wrapper(messages)
+            return self._parse_response(response, user_query)
 
         except Exception as e:
             logger.error(f"LLM classification failed: {e}")

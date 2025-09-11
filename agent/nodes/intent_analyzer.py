@@ -3,6 +3,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 import logging
 
+from agent.helper import litellm_wrapper
 from agent.schema_extractor import SchemaExtractor
 
 logger = logging.getLogger(__name__)
@@ -15,8 +16,7 @@ class IntentAnalyzer:
     Stage 2: Analyze user intent to determine specific tables, columns, and conditions
     """
 
-    def __init__(self, llm: ChatOpenAI):
-        self.llm = llm
+    def __init__(self):
         self.schema_extractor = SchemaExtractor()
         self.schema_info = self.schema_extractor.get_schema_for_classification()
 
@@ -37,8 +37,8 @@ class IntentAnalyzer:
                           reasoning: str, conversation_history: str) -> dict[str, Any]:
         """Analyze intent using LLM"""
 
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", f"""You are analyzing user intent for a {operation_type} database operation.
+        messages = [
+            {"role": "system","content": f"""You are analyzing user intent for a {operation_type} database operation.
 
 DATABASE SCHEMA:
 {self.schema_info}
@@ -58,12 +58,12 @@ Respond in this exact format:
 INTENT: [clear description of what user wants]
 TABLES: [table names needed, comma-separated]
 COLUMNS: [specific columns needed, comma-separated]
-CONDITIONS: [filtering conditions if any]"""),
-            ("human", f"Analyze: '{user_query}'")
-        ])
+CONDITIONS: [filtering conditions if any]"""},
+            {"role": "user","content": f"Analyze: '{user_query}'"}
+        ]
 
-        response = self.llm.invoke(prompt.format_messages())
-        return self._parse_intent_response(response.content)
+        response = litellm_wrapper(messages)
+        return self._parse_intent_response(response)
 
     @staticmethod
     def _parse_intent_response(response: str) -> dict[str, Any]:
